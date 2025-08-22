@@ -14,9 +14,10 @@ class AlexFlipCoffeeRepository implements CoffeeRepository {
   final List<CoffeeImage> _favorites = <CoffeeImage>[];
 
   String _idFromUrl(Uri url) {
-    // Use the last path segment as ID; fallback to hash if empty
-    final name = url.pathSegments.isNotEmpty ? url.pathSegments.last : '';
-    return name.isNotEmpty ? name : url.toString().hashCode.toRadixString(36);
+    final segs = url.pathSegments;
+    final last = segs.isNotEmpty ? segs.last : null;
+    if (last != null && last.isNotEmpty) return last;
+    return url.toString().hashCode.toRadixString(36);
   }
 
   Future<Uri> _fetchRandomUri() async {
@@ -44,9 +45,8 @@ class AlexFlipCoffeeRepository implements CoffeeRepository {
   Future<List<CoffeeImage>> fetchBatch(int count) async {
     final out = <CoffeeImage>[];
     for (var i = 0; i < count; i++) {
-      final imageUri = await _fetchRandomUri();
-      out.add(CoffeeImage(id: _idFromUrl(imageUri), remoteUrl: imageUri));
-      // Small delay helps avoid burst traffic
+      final uri = await _fetchRandomUri();
+      out.add(CoffeeImage(id: _idFromUrl(uri), remoteUrl: uri));
       await Future<void>.delayed(const Duration(milliseconds: 80));
     }
     return out;
@@ -54,8 +54,12 @@ class AlexFlipCoffeeRepository implements CoffeeRepository {
 
   @override
   Future<void> saveFavorite(CoffeeImage image) async {
-    // Note: local persistence handled elsewhere; we keep a simple in-memory list here.
+    if (_favorites.any((e) => e.id == image.id)) return;
     _favorites.add(image);
+  }
+
+  void removeFavoriteById(String id) {
+    _favorites.removeWhere((e) => e.id == id);
   }
 
   List<CoffeeImage> get favorites => List.unmodifiable(_favorites);

@@ -5,6 +5,7 @@ import 'package:very_good_coffee/domain/repositories/alexflip_coffee_repository.
 import 'package:very_good_coffee/presentation/brew_swipe/bloc/brew_swipe_bloc.dart';
 import 'package:very_good_coffee/presentation/brew_swipe/widgets/coffee_card.dart';
 import 'package:very_good_coffee/presentation/gallery/gallery_page.dart';
+import 'package:very_good_coffee/presentation/saved/saved_page.dart';
 
 class BrewSwipePage extends StatefulWidget {
   const BrewSwipePage({super.key});
@@ -26,7 +27,11 @@ class _BrewSwipePageState extends State<BrewSwipePage> {
               ..add(const BrewSwipeStarted()),
         child: Scaffold(
           appBar: AppBar(
-            title: Text(_index == 0 ? 'BrewSwipe' : 'Gallery'),
+            title: Text(_index == 0
+                ? 'BrewSwipe'
+                : _index == 1
+                    ? 'Gallery'
+                    : 'Saved'),
             actions: _index == 0
                 ? [
                     IconButton(
@@ -45,6 +50,7 @@ class _BrewSwipePageState extends State<BrewSwipePage> {
               children: const [
                 _BrewSwipeBody(),
                 GalleryPage(),
+                SavedPage(),
               ],
             ),
           ),
@@ -59,6 +65,10 @@ class _BrewSwipePageState extends State<BrewSwipePage> {
               BottomNavigationBarItem(
                 icon: Icon(Icons.grid_on),
                 label: 'Gallery',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.bookmark_outline),
+                label: 'Saved',
               ),
             ],
           ),
@@ -138,69 +148,37 @@ class _BrewSwipeBodyState extends State<_BrewSwipeBody>
                     child: Center(
                       child: AspectRatio(
                         aspectRatio: 9 / 14,
-                        child: Stack(
-                          children: [
-                            Center(
-                              child: Transform.translate(
-                                offset: const Offset(0, 6),
-                                child: Transform.scale(
-                                  scale: 0.976,
-                                  child: const _GreyCard(),
-                                ),
-                              ),
-                            ),
-                            Center(
-                              child: Transform.translate(
-                                offset: const Offset(0, 4),
-                                child: Transform.scale(
-                                  scale: 0.984,
-                                  child: const _GreyCard(),
-                                ),
-                              ),
-                            ),
-                            Center(
-                              child: Transform.translate(
-                                offset: const Offset(0, 2),
-                                child: Transform.scale(
-                                  scale: _backScale(context),
-                                  child: const _GreyCard(),
-                                ),
-                              ),
-                            ),
-                            GestureDetector(
-                              onHorizontalDragUpdate: (d) {
-                                if (_ctrl.isAnimating) return;
-                                setState(() => _drag += d.delta.dx);
-                              },
-                              onHorizontalDragEnd: (d) async {
-                                final w = MediaQuery.of(context).size.width;
-                                final v = d.velocity.pixelsPerSecond.dx;
-                                final threshold = w * 0.25;
-                                final dir =
-                                    (_drag.abs() > threshold || v.abs() > 600)
-                                        ? (_drag > 0 ? 1 : -1)
-                                        : 0;
-                                if (dir == 0) {
-                                  await _animateTo(0);
-                                  return;
-                                }
-                                await _animateAndAdvance(dir);
-                              },
-                              child: AnimatedBuilder(
-                                animation: _ctrl,
-                                builder: (context, _) {
-                                  final x =
-                                      _ctrl.isAnimating ? _anim.value : _drag;
-                                  return Transform.translate(
-                                    offset: Offset(x, 0),
-                                    child: CoffeeCard(
-                                        key: ValueKey('front_${current.id}'),
-                                        image: current),
-                                  );
-                                },
-                              ),
-                            ),
-                          ],
+                        child: GestureDetector(
+                          onHorizontalDragUpdate: (d) {
+                            if (_ctrl.isAnimating) return;
+                            setState(() => _drag += d.delta.dx);
+                          },
+                          onHorizontalDragEnd: (d) async {
+                            final w = MediaQuery.of(context).size.width;
+                            final v = d.velocity.pixelsPerSecond.dx;
+                            final threshold = w * 0.25;
+                            final dir =
+                                (_drag.abs() > threshold || v.abs() > 600)
+                                    ? (_drag > 0 ? 1 : -1)
+                                    : 0;
+                            if (dir == 0) {
+                              await _animateTo(0);
+                              return;
+                            }
+                            await _animateAndAdvance(dir);
+                          },
+                          child: AnimatedBuilder(
+                            animation: _ctrl,
+                            builder: (context, _) {
+                              final x = _ctrl.isAnimating ? _anim.value : _drag;
+                              return Transform.translate(
+                                offset: Offset(x, 0),
+                                child: CoffeeCard(
+                                    key: ValueKey('front_${current.id}'),
+                                    image: current),
+                              );
+                            },
+                          ),
                         ),
                       ),
                     ),
@@ -241,19 +219,6 @@ class _BrewSwipeBodyState extends State<_BrewSwipeBody>
     _drag = 0;
     _ctrl.value = 0;
     setState(() {});
-  }
-
-  double _progress(BuildContext context) {
-    final w = MediaQuery.of(context).size.width;
-    final val = _ctrl.isAnimating ? (_anim.value.abs() / w) : (_drag.abs() / w);
-    if (val < 0) return 0;
-    if (val > 1) return 1;
-    return val;
-  }
-
-  double _backScale(BuildContext context) {
-    final p = _progress(context);
-    return (0.992 + 0.008 * p) / 2;
   }
 }
 
@@ -427,20 +392,6 @@ class _SwipeHint extends StatelessWidget {
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _GreyCard extends StatelessWidget {
-  const _GreyCard();
-  @override
-  Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(24),
-      child: const DecoratedBox(
-        decoration: BoxDecoration(color: Colors.black45),
-        child: SizedBox.expand(),
       ),
     );
   }

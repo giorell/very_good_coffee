@@ -42,6 +42,7 @@ class CoffeeCard extends StatelessWidget {
               errorWidget: (_, __, ___) => const Center(
                 child: Text('Could not load image'),
               ),
+              useOldImageOnUrlChange: true,
               fadeInDuration: Duration.zero,
               fadeOutDuration: Duration.zero,
             ),
