@@ -41,3 +41,11 @@ A simple Flutter app for discovering coffee photos. Swipe through random images,
 
 - Images are loaded from `https://coffee.alexflipnote.dev`.
 - Saved items persist across restarts using Hive (`favorites` box). If you reinstall or clear app data, saved items will be removed.
+
+## Screenshots
+
+<p align="center">
+  <img src="screenshots/swipe.png" width="30%" />
+  <img src="screenshots/gallery.png" width="30%" />
+  <img src="screenshots/saved.png" width="30%" />
+</p>
