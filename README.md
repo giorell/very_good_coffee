@@ -1,16 +1,43 @@
-# very_good_coffee
+# Very Good Coffee
 
-A new Flutter project.
+A simple Flutter app for discovering coffee photos. Swipe through random images, browse a responsive gallery, and save your favorites for later. Saved items persist locally using Hive.
 
-## Getting Started
+## App Pages
 
-This project is a starting point for a Flutter application.
+- **BrewSwipe (Swipe)** — Swipe **right** to save, **left** to skip. Smooth slide animation, subtle on-screen hints, and background prefetching for instant transitions.
+- **Gallery** — Infinite, responsive grid that loads multiple photos at a time. Pull to refresh.
+- **Saved** — Your saved images with local persistence (Hive). Tap the trash icon on a tile to remove it.
 
-A few resources to get you started if this is your first Flutter project:
+## How to Run
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+### Prerequisites
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+- Flutter 3.x and Dart 3.x installed
+- A connected device or emulator (iOS/Android), or a desktop/web target
+
+### Steps
+
+1. Install dependencies:
+   ```bash
+   flutter pub get
+   ```
+2. Run on a device/emulator (Flutter will prompt for a target if multiple are available):
+
+   ```bash
+   flutter run
+   ```
+
+   Targets:
+
+   - Android: `flutter run -d android`
+   - iOS Simulator: `flutter run -d ios`
+
+3. (Optional) Run tests:
+   ```bash
+   flutter test
+   ```
+
+### Notes
+
+- Images are loaded from `https://coffee.alexflipnote.dev`.
+- Saved items persist across restarts using Hive (`favorites` box). If you reinstall or clear app data, saved items will be removed.

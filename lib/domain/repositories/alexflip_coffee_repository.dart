@@ -1,23 +1,33 @@
 import 'dart:convert';
+import 'package:hive/hive.dart';
 import 'package:http/http.dart' as http;
 import 'package:very_good_coffee/domain/entities/coffee_image.dart';
 import 'package:very_good_coffee/domain/repositories/coffee_repository.dart';
 
 class AlexFlipCoffeeRepository implements CoffeeRepository {
-  AlexFlipCoffeeRepository(
-      {http.Client? client, this.baseUrl = 'https://coffee.alexflipnote.dev'})
-      : _client = client ?? http.Client();
+  AlexFlipCoffeeRepository({
+    http.Client? client,
+    this.baseUrl = 'https://coffee.alexflipnote.dev',
+    Box<CoffeeImage>? box,
+  })  : _client = client ?? http.Client(),
+        _box = box ?? Hive.box<CoffeeImage>('favorites') {
+    _favorites
+      ..clear()
+      ..addAll(_box.values);
+  }
 
   final http.Client _client;
   final String baseUrl;
+  final Box<CoffeeImage> _box;
 
   final List<CoffeeImage> _favorites = <CoffeeImage>[];
 
   String _idFromUrl(Uri url) {
     final segs = url.pathSegments;
     final last = segs.isNotEmpty ? segs.last : null;
-    if (last != null && last.isNotEmpty) return last;
-    return url.toString().hashCode.toRadixString(36);
+    return (last != null && last.isNotEmpty)
+        ? last
+        : url.toString().hashCode.toRadixString(36);
   }
 
   Future<Uri> _fetchRandomUri() async {
@@ -56,10 +66,12 @@ class AlexFlipCoffeeRepository implements CoffeeRepository {
   Future<void> saveFavorite(CoffeeImage image) async {
     if (_favorites.any((e) => e.id == image.id)) return;
     _favorites.add(image);
+    await _box.put(image.id, image);
   }
 
   void removeFavoriteById(String id) {
     _favorites.removeWhere((e) => e.id == id);
+    _box.delete(id);
   }
 
   List<CoffeeImage> get favorites => List.unmodifiable(_favorites);

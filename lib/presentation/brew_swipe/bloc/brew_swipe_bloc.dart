@@ -10,7 +10,12 @@ part 'brew_swipe_event.dart';
 part 'brew_swipe_state.dart';
 
 class BrewSwipeBloc extends Bloc<BrewSwipeEvent, BrewSwipeState> {
-  BrewSwipeBloc(this._repo) : super(const BrewSwipeState.initial()) {
+  BrewSwipeBloc(this._repo, {Future<void> Function(Iterable<Uri>)? warm})
+      : _warmCache = warm ??
+            ((urls) => warmCache(urls,
+                maxConcurrent: 2,
+                delayBetween: const Duration(milliseconds: 120))),
+        super(const BrewSwipeState.initial()) {
     on<BrewSwipeStarted>(_onStarted);
     on<BrewSwipeSkipPressed>(_onSkip);
     on<BrewSwipeSavePressed>(_onSave);
@@ -19,6 +24,7 @@ class BrewSwipeBloc extends Bloc<BrewSwipeEvent, BrewSwipeState> {
   }
 
   final CoffeeRepository _repo;
+  final Future<void> Function(Iterable<Uri>) _warmCache;
 
   static const _bufferTarget = 6;
   static const _refillAt = 3;
@@ -32,8 +38,7 @@ class BrewSwipeBloc extends Bloc<BrewSwipeEvent, BrewSwipeState> {
     try {
       // fill cache
       final batch = await _repo.fetchBatch(_bufferTarget);
-      await warmCache(batch.map((e) => e.remoteUrl),
-          maxConcurrent: 2, delayBetween: const Duration(milliseconds: 120));
+      await _warmCache(batch.map((e) => e.remoteUrl));
 
       // load First image then buffer
       emit(state.copyWith(
@@ -99,8 +104,7 @@ class BrewSwipeBloc extends Bloc<BrewSwipeEvent, BrewSwipeState> {
       final need = _bufferTarget - state.buffer.length;
       if (need > 0) {
         final batch = await _repo.fetchBatch(need);
-        await warmCache(batch.map((e) => e.remoteUrl),
-            maxConcurrent: 2, delayBetween: const Duration(milliseconds: 120));
+        await _warmCache(batch.map((e) => e.remoteUrl));
         emit(state.copyWith(buffer: [...state.buffer, ...batch]));
       }
     } finally {

@@ -6,6 +6,8 @@ import 'package:very_good_coffee/presentation/brew_swipe/bloc/brew_swipe_bloc.da
 import 'package:very_good_coffee/presentation/brew_swipe/widgets/coffee_card.dart';
 import 'package:very_good_coffee/presentation/gallery/gallery_page.dart';
 import 'package:very_good_coffee/presentation/saved/saved_page.dart';
+import 'package:hive/hive.dart';
+import 'package:very_good_coffee/domain/entities/coffee_image.dart';
 
 class BrewSwipePage extends StatefulWidget {
   const BrewSwipePage({super.key});
@@ -15,24 +17,25 @@ class BrewSwipePage extends StatefulWidget {
 }
 
 class _BrewSwipePageState extends State<BrewSwipePage> {
-  int _index = 0;
+  int _selectedTabIndex = 0;
 
   @override
   Widget build(BuildContext context) {
     return RepositoryProvider(
-      create: (_) => AlexFlipCoffeeRepository(),
+      create: (_) =>
+          AlexFlipCoffeeRepository(box: Hive.box<CoffeeImage>('favorites')),
       child: BlocProvider(
         create: (context) =>
             BrewSwipeBloc(context.read<AlexFlipCoffeeRepository>())
               ..add(const BrewSwipeStarted()),
         child: Scaffold(
           appBar: AppBar(
-            title: Text(_index == 0
+            title: Text(_selectedTabIndex == 0
                 ? 'BrewSwipe'
-                : _index == 1
+                : _selectedTabIndex == 1
                     ? 'Gallery'
                     : 'Saved'),
-            actions: _index == 0
+            actions: _selectedTabIndex == 0
                 ? [
                     IconButton(
                       tooltip: 'Retry',
@@ -46,7 +49,7 @@ class _BrewSwipePageState extends State<BrewSwipePage> {
           ),
           body: SafeArea(
             child: IndexedStack(
-              index: _index,
+              index: _selectedTabIndex,
               children: const [
                 _BrewSwipeBody(),
                 GalleryPage(),
@@ -55,8 +58,8 @@ class _BrewSwipePageState extends State<BrewSwipePage> {
             ),
           ),
           bottomNavigationBar: BottomNavigationBar(
-            currentIndex: _index,
-            onTap: (i) => setState(() => _index = i),
+            currentIndex: _selectedTabIndex,
+            onTap: (i) => setState(() => _selectedTabIndex = i),
             items: const [
               BottomNavigationBarItem(
                 icon: Icon(Icons.local_cafe),
@@ -87,26 +90,26 @@ class _BrewSwipeBody extends StatefulWidget {
 class _BrewSwipeBodyState extends State<_BrewSwipeBody>
     with SingleTickerProviderStateMixin {
   bool _hintVisible = false;
-  bool _hintScheduled = false;
-  Timer? _timer;
+  bool _isHintScheduled = false;
+  Timer? _hintDismissTimer;
 
-  late AnimationController _ctrl;
-  late Animation<double> _anim;
-  double _drag = 0;
+  late AnimationController _animationController;
+  late Animation<double> _slideAnimation;
+  double _dragOffsetX = 0;
 
   @override
   void initState() {
     super.initState();
-    _ctrl = AnimationController(
+    _animationController = AnimationController(
         vsync: this, duration: const Duration(milliseconds: 220));
-    _anim = Tween<double>(begin: 0, end: 0)
-        .animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOut));
+    _slideAnimation = Tween<double>(begin: 0, end: 0).animate(
+        CurvedAnimation(parent: _animationController, curve: Curves.easeOut));
   }
 
   @override
   void dispose() {
-    _ctrl.dispose();
-    _timer?.cancel();
+    _animationController.dispose();
+    _hintDismissTimer?.cancel();
     super.dispose();
   }
 
@@ -125,14 +128,14 @@ class _BrewSwipeBodyState extends State<_BrewSwipeBody>
             if (current == null)
               return const Center(child: CircularProgressIndicator());
 
-            if (!_hintScheduled) {
+            if (!_isHintScheduled) {
               WidgetsBinding.instance.addPostFrameCallback((_) {
-                if (!mounted || _hintScheduled) return;
+                if (!mounted || _isHintScheduled) return;
                 setState(() {
                   _hintVisible = true;
-                  _hintScheduled = true;
+                  _isHintScheduled = true;
                 });
-                _timer = Timer(const Duration(seconds: 2), () {
+                _hintDismissTimer = Timer(const Duration(seconds: 2), () {
                   if (mounted) setState(() => _hintVisible = false);
                 });
               });
@@ -149,30 +152,35 @@ class _BrewSwipeBodyState extends State<_BrewSwipeBody>
                       child: AspectRatio(
                         aspectRatio: 9 / 14,
                         child: GestureDetector(
-                          onHorizontalDragUpdate: (d) {
-                            if (_ctrl.isAnimating) return;
-                            setState(() => _drag += d.delta.dx);
+                          onHorizontalDragUpdate: (details) {
+                            if (_animationController.isAnimating) return;
+                            setState(() => _dragOffsetX += details.delta.dx);
                           },
-                          onHorizontalDragEnd: (d) async {
-                            final w = MediaQuery.of(context).size.width;
-                            final v = d.velocity.pixelsPerSecond.dx;
-                            final threshold = w * 0.25;
-                            final dir =
-                                (_drag.abs() > threshold || v.abs() > 600)
-                                    ? (_drag > 0 ? 1 : -1)
+                          onHorizontalDragEnd: (details) async {
+                            final screenWidth =
+                                MediaQuery.of(context).size.width;
+                            final velocityX =
+                                details.velocity.pixelsPerSecond.dx;
+                            final direction =
+                                (_dragOffsetX.abs() > screenWidth * 0.25 ||
+                                        velocityX.abs() > 600)
+                                    ? (_dragOffsetX > 0 ? 1 : -1)
                                     : 0;
-                            if (dir == 0) {
+                            if (direction == 0) {
                               await _animateTo(0);
                               return;
                             }
-                            await _animateAndAdvance(dir);
+                            await _animateAndAdvance(direction);
                           },
                           child: AnimatedBuilder(
-                            animation: _ctrl,
+                            animation: _animationController,
                             builder: (context, _) {
-                              final x = _ctrl.isAnimating ? _anim.value : _drag;
+                              final translateX =
+                                  _animationController.isAnimating
+                                      ? _slideAnimation.value
+                                      : _dragOffsetX;
                               return Transform.translate(
-                                offset: Offset(x, 0),
+                                offset: Offset(translateX, 0),
                                 child: CoffeeCard(
                                     key: ValueKey('front_${current.id}'),
                                     image: current),
@@ -199,25 +207,25 @@ class _BrewSwipeBodyState extends State<_BrewSwipeBody>
   }
 
   Future<void> _animateTo(double target) async {
-    _anim = Tween<double>(begin: _drag, end: target)
-        .animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOut));
-    _ctrl.reset();
+    _slideAnimation = Tween<double>(begin: _dragOffsetX, end: target).animate(
+        CurvedAnimation(parent: _animationController, curve: Curves.easeOut));
+    _animationController.reset();
     setState(() {});
-    await _ctrl.forward();
-    _drag = target;
+    await _animationController.forward();
+    _dragOffsetX = target;
   }
 
-  Future<void> _animateAndAdvance(int dir) async {
-    final w = MediaQuery.of(context).size.width;
-    await _animateTo(dir * w);
+  Future<void> _animateAndAdvance(int direction) async {
+    final screenWidth = MediaQuery.of(context).size.width;
+    await _animateTo(direction * screenWidth);
     final bloc = context.read<BrewSwipeBloc>();
-    if (dir > 0) {
+    if (direction > 0) {
       bloc.add(const BrewSwipeSavePressed());
     } else {
       bloc.add(const BrewSwipeSkipPressed());
     }
-    _drag = 0;
-    _ctrl.value = 0;
+    _dragOffsetX = 0;
+    _animationController.value = 0;
     setState(() {});
   }
 }
@@ -268,12 +276,12 @@ class _BottomBar extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: [
-        _ActionBtn(
+        _ActionButton(
           icon: Icons.close,
           label: 'Skip',
           onTap: onSkip,
         ),
-        _ActionBtn(
+        _ActionButton(
           icon: Icons.favorite,
           label: 'Save',
           onTap: onSave,
@@ -283,8 +291,8 @@ class _BottomBar extends StatelessWidget {
   }
 }
 
-class _ActionBtn extends StatelessWidget {
-  const _ActionBtn({
+class _ActionButton extends StatelessWidget {
+  const _ActionButton({
     required this.icon,
     required this.label,
     required this.onTap,
@@ -349,6 +357,8 @@ class _HintPill extends StatelessWidget {
           Icon(icon, size: 18, color: color),
           const SizedBox(width: 6),
           Text(text,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(color: color, fontWeight: FontWeight.w600)),
         ],
       ),
@@ -368,24 +378,30 @@ class _SwipeHint extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.all(12),
           child: Row(
-            children: const [
+            children: [
               Expanded(
                 child: Align(
                   alignment: Alignment.centerLeft,
-                  child: _HintPill(
-                    icon: Icons.arrow_back,
-                    text: 'Swipe left to skip',
-                    color: Colors.red,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 82),
+                    child: const _HintPill(
+                      icon: Icons.arrow_back,
+                      text: 'Skip',
+                      color: Colors.red,
+                    ),
                   ),
                 ),
               ),
               Expanded(
                 child: Align(
                   alignment: Alignment.centerRight,
-                  child: _HintPill(
-                    icon: Icons.arrow_forward,
-                    text: 'Swipe right to save',
-                    color: Colors.green,
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(maxWidth: 84),
+                    child: _HintPill(
+                      icon: Icons.arrow_forward,
+                      text: 'Save',
+                      color: Colors.green,
+                    ),
                   ),
                 ),
               ),
